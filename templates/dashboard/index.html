@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SecureAuth{% endblock %}
+
+{% block content %}
+{% if user %}
+<div class="dashboard-header mb-2" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1 style="color: var(--primary-color);">Welcome back, {{ user.fullname }}!</h1>
+        <p style="color: var(--text-muted);">Here is your account overview.</p>
+    </div>
+    <div>
+        <span class="badge {{ 'badge-success' if user.account_status == 'active' else 'badge-error' }}">
+            {{ user.account_status | title }}
+        </span>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-clock"></i></div>
+        <div class="stat-details">
+            <h3>Registered On</h3>
+            <p style="font-size: 1.2rem;">{{ user.created_at.strftime('%b %d, %Y') if user.created_at else 'N/A' }}</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-right-to-bracket"></i></div>
+        <div class="stat-details">
+            <h3>Total Logins</h3>
+            <p>{{ login_count | default(0) }}</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-history"></i></div>
+        <div class="stat-details">
+            <h3>Last Login</h3>
+            <p style="font-size: 1.2rem;">{{ last_login.strftime('%b %d, %I:%M %p') if last_login else 'Just now' }}</p>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+    <!-- Profile Info -->
+    <div class="card">
+        <div class="card-header" style="text-align: left;">
+            <h2><i class="fa-solid fa-id-card"></i> Profile Info</h2>
+        </div>
+        <ul style="list-style: none; line-height: 2.5;">
+            <li><strong>Full Name:</strong> {{ user.fullname }}</li>
+            <li><strong>Username:</strong> @{{ user.username }}</li>
+            <li><strong>Email:</strong> {{ user.email }}</li>
+            <li><strong>Mobile:</strong> {{ user.mobile }}</li>
+        </ul>
+    </div>
+    
+    <!-- Login History -->
+    <div class="card">
+        <div class="card-header" style="text-align: left;">
+            <h2><i class="fa-solid fa-list-ul"></i> Recent Logins</h2>
+        </div>
+        
+        {% if recent_logins %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>IP Address</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_logins %}
+                    <tr>
+                        <td>{{ log.login_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>{{ log.ip_address }}</td>
+                        <td>
+                            {% if log.logout_time %}
+                                <span class="badge badge-warning">Logged Out</span>
+                            {% else %}
+                                <span class="badge badge-success">Active Session</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="color: var(--text-muted);">No recent logins found.</p>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="dashboard-header mb-2">
+    <h1 style="color: var(--error-color);">Dashboard Error</h1>
+    <p style="color: var(--text-muted);">The required user information could not be loaded. Please <a href="{{ url_for('login_page') }}">log in again</a>.</p>
+</div>
+{% endif %}
+{% endblock %}

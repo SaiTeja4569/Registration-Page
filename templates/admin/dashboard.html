@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - SecureAuth{% endblock %}
+
+{% block content %}
+{% if stats and users is defined %}
+<div class="dashboard-header mb-2">
+    <h1 style="color: var(--primary-color);">System Administration</h1>
+    <p style="color: var(--text-muted);">Manage users and monitor system activity.</p>
+</div>
+
+<!-- Admin Stats -->
+<div class="dashboard-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="color: #3498db; background-color: rgba(52, 152, 219, 0.1);"><i class="fa-solid fa-users"></i></div>
+        <div class="stat-details">
+            <h3>Total Users</h3>
+            <p>{{ stats.total_users }}</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon" style="color: var(--success-color); background-color: rgba(39, 174, 96, 0.1);"><i class="fa-solid fa-user-check"></i></div>
+        <div class="stat-details">
+            <h3>Active Users</h3>
+            <p>{{ stats.active_users }}</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon" style="color: #9b59b6; background-color: rgba(155, 89, 182, 0.1);"><i class="fa-solid fa-sign-in-alt"></i></div>
+        <div class="stat-details">
+            <h3>Today's Logins</h3>
+            <p>{{ stats.today_logins }}</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon" style="color: #e67e22; background-color: rgba(230, 126, 34, 0.1);"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="stat-details">
+            <h3>Total Logins</h3>
+            <p>{{ stats.total_logins }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- User Management -->
+<div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; text-align: left; margin-bottom: 1.5rem;">
+        <div>
+            <h2 style="margin: 0;"><i class="fa-solid fa-users-gear"></i> User Directory</h2>
+        </div>
+        <!-- Search Form -->
+        <form method="GET" action="{{ url_for('admin_dashboard') }}" style="display: flex; gap: 0.5rem;">
+            <input type="text" name="search" class="form-control" placeholder="Search username/email..." value="{{ request.args.get('search', '') }}" style="width: 250px; padding: 0.5rem;">
+            <select name="sort" class="form-control" style="width: auto; padding: 0.5rem;">
+                <option value="id_desc" {% if request.args.get('sort') == 'id_desc' %}selected{% endif %}>Newest</option>
+                <option value="id_asc" {% if request.args.get('sort') == 'id_asc' %}selected{% endif %}>Oldest</option>
+                <option value="username_asc" {% if request.args.get('sort') == 'username_asc' %}selected{% endif %}>Username (A-Z)</option>
+            </select>
+            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Filter</button>
+        </form>
+    </div>
+    
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Registered</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>#{{ user.id }}</td>
+                    <td>
+                        <div style="font-weight: 600;">{{ user.fullname }}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">@{{ user.username }} | {{ user.email }}</div>
+                    </td>
+                    <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <span class="badge {{ 'badge-success' if user.account_status == 'active' else 'badge-error' }}">
+                            {{ user.account_status | title }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('admin_user_logs', user_id=user.id) }}" class="btn btn-outline" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">View Logs</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">No users found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.5rem;">
+        {% for p in range(1, total_pages + 1) %}
+            <a href="{{ url_for('admin_dashboard', page=p, search=request.args.get('search', ''), sort=request.args.get('sort', '')) }}" 
+               class="btn {{ 'btn-primary' if p == current_page else 'btn-outline' }}" 
+               style="padding: 0.3rem 0.8rem;">
+               {{ p }}
+            </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="dashboard-header mb-2">
+    <h1 style="color: var(--error-color);">Admin Dashboard Error</h1>
+    <p style="color: var(--text-muted);">The required statistics could not be loaded. Please <a href="{{ url_for('admin_login_page') }}">log in again</a>.</p>
+</div>
+{% endif %}
+{% endblock %}

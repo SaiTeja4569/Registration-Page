@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Login - SecureAuth{% endblock %}
+
+{% block content %}
+<div style="max-width: 450px; margin: 2rem auto;">
+    <div class="card" style="border-top: 4px solid var(--error-color);">
+        <div class="card-header">
+            <h2><i class="fa-solid fa-shield-halved" style="color: var(--error-color);"></i> Admin Portal</h2>
+            <p>Restricted access only</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin_login_page') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label class="form-label" for="username">Admin Username</label>
+                <input type="text" id="username" name="username" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+            </div>
+
+            <button type="submit" class="btn btn-danger btn-block">Secure Login</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

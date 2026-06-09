@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Register - SecureAuth{% endblock %}
+
+{% block content %}
+<div style="max-width: 550px; margin: 2rem auto;">
+    <div class="card">
+        <div class="card-header">
+            <h2>Create Account</h2>
+            <p>Join us today to get started</p>
+        </div>
+        
+        <form id="registerForm" method="POST" action="{{ url_for('api_register') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <div class="form-group">
+                <label class="form-label" for="fullname">Full Name</label>
+                <input type="text" id="fullname" name="fullname" class="form-control" required placeholder="John Doe">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="email">Email Address</label>
+                <input type="email" id="email" name="email" class="form-control" required placeholder="john@example.com">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="mobile">Mobile Number</label>
+                <input type="text" id="mobile" name="mobile" class="form-control" required placeholder="1234567890">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="username">Username</label>
+                <input type="text" id="username" name="username" class="form-control" required placeholder="johndoe">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-control" required placeholder="Must include upper, lower, number & special char">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" class="form-control" required placeholder="Confirm your password">
+            </div>
+            
+            <div id="registerMessage" style="margin-bottom: 1rem; text-align: center; font-weight: 500;"></div>
+            
+            <button type="submit" class="btn btn-primary btn-block" id="registerBtn">Create Account</button>
+        </form>
+        
+        <div class="text-center mt-1">
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Already have an account? <a href="{{ url_for('login_page') }}">Login here</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('registerBtn');
+    const msg = document.getElementById('registerMessage');
+    
+    btn.disabled = true;
+    btn.innerHTML = 'Creating Account...';
+    
+    const formData = new FormData(this);
+    
+    fetch(this.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if(data.success) {
+            msg.style.color = 'var(--success-color)';
+            msg.innerText = data.message;
+            setTimeout(() => {
+                window.location.href = "{{ url_for('login_page') }}";
+            }, 1500);
+        } else {
+            msg.style.color = 'var(--error-color)';
+            msg.innerText = data.message;
+            btn.disabled = false;
+            btn.innerHTML = 'Create Account';
+        }
+    })
+    .catch(err => {
+        msg.style.color = 'var(--error-color)';
+        msg.innerText = 'An error occurred. Please try again.';
+        btn.disabled = false;
+        btn.innerHTML = 'Create Account';
+    });
+});
+</script>
+{% endblock %}

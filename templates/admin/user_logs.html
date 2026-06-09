@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}User Logs - SecureAuth{% endblock %}
+
+{% block content %}
+{% if target_user %}
+<div class="mb-2" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1 style="color: var(--primary-color);">Login History: {{ target_user.fullname }}</h1>
+        <p style="color: var(--text-muted);">@{{ target_user.username }} | {{ target_user.email }}</p>
+    </div>
+    <div>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline">&larr; Back to Dashboard</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Login Time</th>
+                    <th>Logout Time</th>
+                    <th>Duration</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.login_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>
+                        {% if log.logout_time %}
+                            {{ log.logout_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                        {% else %}
+                            <span class="badge badge-success">Active</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.logout_time %}
+                            {{ ((log.logout_time - log.login_time).seconds / 60)|round|int }} mins
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ log.ip_address }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center">No login history found for this user.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="dashboard-header mb-2">
+    <h1 style="color: var(--error-color);">Logs Error</h1>
+    <p style="color: var(--text-muted);">Target user could not be found. Please return to the <a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a>.</p>
+</div>
+{% endif %}
+{% endblock %}

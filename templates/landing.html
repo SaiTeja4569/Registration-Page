@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - SecureAuth System{% endblock %}
+
+{% block content %}
+<div class="welcome-container" style="text-align: center; padding: 4rem 2rem;">
+    <h1 style="font-size: 3rem; color: var(--primary-color); margin-bottom: 1rem;">Secure Enterprise Authentication</h1>
+    <p style="font-size: 1.2rem; color: var(--secondary-color); margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+        A robust, modern, and highly secure authentication system built with Flask and MySQL. Designed for performance and reliability.
+    </p>
+    <div style="margin-bottom: 4rem;">
+        <a href="{{ url_for('register_page') }}" class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.1rem; margin-right: 1rem;">Get Started</a>
+        <a href="{{ url_for('login_page') }}" class="btn btn-outline" style="padding: 1rem 2rem; font-size: 1.1rem;">Login Now</a>
+    </div>
+
+    <!-- Features Section -->
+    <div class="dashboard-grid" style="text-align: left;">
+        <div class="card">
+            <div class="card-header" style="text-align: left;">
+                <h2><i class="fa-solid fa-lock" style="color: var(--primary-color);"></i> Advanced Security</h2>
+                <p>Bcrypt hashing, CSRF protection, and rigorous input validation ensure your data stays safe.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header" style="text-align: left;">
+                <h2><i class="fa-solid fa-gauge-high" style="color: var(--primary-color);"></i> User Tracking</h2>
+                <p>Comprehensive login history tracking and session management built right in.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header" style="text-align: left;">
+                <h2><i class="fa-solid fa-user-shield" style="color: var(--primary-color);"></i> Admin Panel</h2>
+                <p>Full-featured admin interface to manage users, monitor activity, and view statistics.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Section -->
+    <div class="card mt-2" style="text-align: left; background-color: #f8f9fa;">
+        <div class="card-header">
+            <h2>About This Project</h2>
+        </div>
+        <p style="color: var(--text-color); line-height: 1.8;">
+            This project serves as a comprehensive demonstration of a modern, production-ready web application backend. It features an optimized MySQL connection pool, robust security practices, and a beautifully crafted user interface. 
+        </p>
+    </div>
+</div>
+{% endblock %}
