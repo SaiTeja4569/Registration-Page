@@ -22,7 +22,8 @@ db_config = {
     "host": app.config['DB_HOST'],
     "user": app.config['DB_USER'],
     "password": app.config['DB_PASSWORD'],
-    "database": app.config['DB_NAME']
+    "database": app.config['DB_NAME'],
+    "port":app.config['DB_PORT']
 }
 
 try:

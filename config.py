@@ -9,6 +9,7 @@ class Config:
     DB_USER = os.environ.get('DB_USER', 'root')
     DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
     DB_NAME = os.environ.get('DB_NAME', 'auth_system')
+    DB_PORT = int(os.environ.get('DB_PORT', 3306))
     
     # Session security settings
     SESSION_COOKIE_HTTPONLY = True
