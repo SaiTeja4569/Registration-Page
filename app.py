@@ -2,7 +2,7 @@ import re
 import os
 import bcrypt
 import math
-from datetime import datetime
+from datetime import datetime,timedelta
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from flask_wtf.csrf import CSRFProtect, CSRFError
@@ -171,6 +171,22 @@ def dashboard():
         
         cursor.execute("SELECT login_time, logout_time, ip_address FROM login_logs WHERE user_id = %s ORDER BY login_time DESC LIMIT 5", (session['user_id'],))
         recent_logins = cursor.fetchall()
+
+        IST_OFFSET = timedelta(hours=5, minutes=30)
+        # Convert user created_at
+        if user and user['created_at']:
+            user['created_at'] = user['created_at'] + IST_OFFSET
+
+        # Convert last login
+        if last_login:
+            last_login = last_login + IST_OFFSET
+
+        # Convert recent login records
+        for log in recent_logins:
+            if log['login_time']:
+                log['login_time'] = log['login_time'] + IST_OFFSET
+            if log['logout_time']:
+                log['logout_time'] = log['logout_time'] + IST_OFFSET
             
         return render_template('dashboard/index.html', user=user, login_count=login_count, last_login=last_login, recent_logins=recent_logins)
     except mysql.connector.Error as err:
