@@ -398,6 +398,12 @@ def admin_dashboard():
         params.extend([per_page, offset])
         cursor.execute(query, params)
         users = cursor.fetchall()
+
+        IST_OFFSET = timedelta(hours=5, minutes=30)
+
+        for user in users:
+            if user['created_at']:
+                user['created_at'] = user['created_at'] + IST_OFFSET
         
         return render_template('admin/dashboard.html', stats=stats, users=users, current_page=page, total_pages=total_pages)
     except mysql.connector.Error as err:
@@ -424,6 +430,15 @@ def admin_user_logs(user_id):
             
         cursor.execute("SELECT login_time, logout_time, ip_address FROM login_logs WHERE user_id = %s ORDER BY login_time DESC LIMIT 50", (user_id,))
         logs = cursor.fetchall()
+
+        IST_OFFSET = timedelta(hours=5, minutes=30)
+
+        for log in logs:
+            if log['login_time']:
+                log['login_time'] = log['login_time'] + IST_OFFSET
+
+            if log['logout_time']:
+                log['logout_time'] = log['logout_time'] + IST_OFFSET
         
         return render_template('admin/user_logs.html', target_user=target_user, logs=logs)
     except mysql.connector.Error as err:
