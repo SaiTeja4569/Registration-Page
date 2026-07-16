@@ -60,7 +60,7 @@ a {
 }
 
 a:hover {
-    color: var(--accent-color);
+    color: blue;
 }
 
 /* Navbar */
