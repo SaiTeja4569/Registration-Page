@@ -6,8 +6,7 @@ from datetime import datetime,timedelta
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from flask_wtf.csrf import CSRFProtect, CSRFError
-import mysql.connector
-from mysql.connector import pooling
+import sqlite3
 from config import Config
 
 # Initialize Flask app
@@ -17,32 +16,40 @@ app.config.from_object(Config)
 # Enable CSRF Protection globally
 csrf = CSRFProtect(app)
 
-# Database Connection Pool Setup
-db_config = {
-    "host": app.config['DB_HOST'],
-    "user": app.config['DB_USER'],
-    "password": app.config['DB_PASSWORD'],
-    "database": app.config['DB_NAME'],
-    "port":app.config['DB_PORT']
-}
+# Database Setup
+db_path = app.config.get('DB_PATH', os.path.join(app.root_path, 'database.db'))
 
-try:
-    # Set up a thread-safe connection pool
-    connection_pool = pooling.MySQLConnectionPool(
-        pool_name="auth_pool",
-        pool_size=5,
-        pool_reset_session=True,
-        **db_config
-    )
-    print("Database connection pool established successfully.")
-except mysql.connector.Error as err:
-    print(f"Database Error: {err}")
-    connection_pool = None
+# Ensure database directory exists
+db_dir = os.path.dirname(db_path)
+if db_dir and not os.path.exists(db_dir):
+    os.makedirs(db_dir, exist_ok=True)
+
+# Custom row factory to return dictionaries with properly parsed datetimes
+def dict_row_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        name = col[0]
+        val = row[idx]
+        if name in ('created_at', 'login_time', 'logout_time') and isinstance(val, str):
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+                try:
+                    val = datetime.strptime(val, fmt)
+                    break
+                except ValueError:
+                    continue
+        d[name] = val
+    return d
+
+# Custom Connection class to ignore dictionary=True parameter in cursor() calls
+class SQLiteConnection(sqlite3.Connection):
+    def cursor(self, *args, **kwargs):
+        return super().cursor()
 
 def get_db_connection():
-    if connection_pool:
-        return connection_pool.get_connection()
-    return mysql.connector.connect(**db_config)
+    conn = sqlite3.connect(db_path, factory=SQLiteConnection)
+    conn.row_factory = dict_row_factory
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
 
 def initialize_database():
     """Initializes tables and creates a default admin if none exists."""
@@ -52,9 +59,7 @@ def initialize_database():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # We assume the database `auth_system` is already created and selected based on db_config.
-        
-        # Read and execute schema.sql (or create tables here)
+        # Read and execute schema.sql
         schema_path = os.path.join(app.root_path, 'database', 'schema.sql')
         if os.path.exists(schema_path):
             with open(schema_path, 'r') as f:
@@ -64,7 +69,7 @@ def initialize_database():
                 for statement in statements:
                     try:
                         cursor.execute(statement)
-                    except mysql.connector.Error as err:
+                    except sqlite3.Error as err:
                         print(f"Database Error during schema execution: {err}")
         
         conn.commit()
@@ -75,13 +80,13 @@ def initialize_database():
             salt = bcrypt.gensalt()
             hashed_pw = bcrypt.hashpw('admin'.encode('utf-8'), salt).decode('utf-8')
             cursor.execute(
-                "INSERT INTO admins (username, password_hash, email) VALUES (%s, %s, %s)",
+                "INSERT INTO admins (username, password_hash, email) VALUES (?, ?, ?)",
                 ('admin', hashed_pw, 'admin@example.com')
             )
             conn.commit()
             print("Default admin created. Username: admin, Password: admin")
             
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Database Error: {err}")
     finally:
         if cursor: cursor.close()
@@ -90,6 +95,7 @@ def initialize_database():
 # Run DB initialization
 with app.app_context():
     initialize_database()
+
 
 # --- Helper Validation Functions ---
 def validate_email(email):
@@ -154,7 +160,7 @@ def dashboard():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        cursor.execute("SELECT fullname, username, email, mobile, created_at, account_status FROM users WHERE id = %s", (session['user_id'],))
+        cursor.execute("SELECT fullname, username, email, mobile, created_at, account_status FROM users WHERE id = ?", (session['user_id'],))
         user = cursor.fetchone()
         
         if not user or user['account_status'] != 'active':
@@ -162,14 +168,14 @@ def dashboard():
             flash("Your account is not active.", "error")
             return redirect(url_for('login_page'))
             
-        cursor.execute("SELECT COUNT(*) as count FROM login_logs WHERE user_id = %s", (session['user_id'],))
+        cursor.execute("SELECT COUNT(*) as count FROM login_logs WHERE user_id = ?", (session['user_id'],))
         login_count = cursor.fetchone()['count']
         
-        cursor.execute("SELECT login_time FROM login_logs WHERE user_id = %s ORDER BY login_time DESC LIMIT 1 OFFSET 1", (session['user_id'],))
+        cursor.execute("SELECT login_time FROM login_logs WHERE user_id = ? ORDER BY login_time DESC LIMIT 1 OFFSET 1", (session['user_id'],))
         last_login_row = cursor.fetchone()
         last_login = last_login_row['login_time'] if last_login_row else None
         
-        cursor.execute("SELECT login_time, logout_time, ip_address FROM login_logs WHERE user_id = %s ORDER BY login_time DESC LIMIT 5", (session['user_id'],))
+        cursor.execute("SELECT login_time, logout_time, ip_address FROM login_logs WHERE user_id = ? ORDER BY login_time DESC LIMIT 5", (session['user_id'],))
         recent_logins = cursor.fetchall()
 
         IST_OFFSET = timedelta(hours=5, minutes=30)
@@ -189,7 +195,7 @@ def dashboard():
                 log['logout_time'] = log['logout_time'] + IST_OFFSET
             
         return render_template('dashboard/index.html', user=user, login_count=login_count, last_login=last_login, recent_logins=recent_logins)
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Database Error: {err}")
         return f"Database Error: {err}", 500
     finally:
@@ -223,19 +229,19 @@ def api_register():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
         if cursor.fetchone(): return jsonify({"success": False, "message": "Email exists."}), 409
-        cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
         if cursor.fetchone(): return jsonify({"success": False, "message": "Username taken."}), 409
 
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         cursor.execute(
-            "INSERT INTO users (fullname, email, mobile, username, password_hash) VALUES (%s, %s, %s, %s, %s)",
+            "INSERT INTO users (fullname, email, mobile, username, password_hash) VALUES (?, ?, ?, ?, ?)",
             (fullname, email, mobile, username, hashed_password)
         )
         conn.commit()
         return jsonify({"success": True, "message": "Registration successful!"}), 201
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Database Error: {err}")
         return jsonify({"success": False, "message": f"Database error: {err}"}), 500
     finally:
@@ -253,7 +259,7 @@ def api_login():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute("SELECT id, username, password_hash, account_status FROM users WHERE username = %s OR email = %s", (username_or_email, username_or_email))
+        cursor.execute("SELECT id, username, password_hash, account_status FROM users WHERE username = ? OR email = ?", (username_or_email, username_or_email))
         user = cursor.fetchone()
 
         if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
@@ -267,7 +273,7 @@ def api_login():
             # Log login
             ip_address = request.remote_addr
             cursor.execute(
-                "INSERT INTO login_logs (user_id, username, ip_address) VALUES (%s, %s, %s)",
+                "INSERT INTO login_logs (user_id, username, ip_address) VALUES (?, ?, ?)",
                 (user['id'], user['username'], ip_address)
             )
             conn.commit()
@@ -278,7 +284,7 @@ def api_login():
             return jsonify({"success": True, "message": "Login successful!"}), 200
 
         return jsonify({"success": False, "message": "Invalid credentials."}), 401
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Database Error: {err}")
         return jsonify({"success": False, "message": f"Database error: {err}"}), 500
     finally:
@@ -294,11 +300,11 @@ def logout():
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE login_logs SET logout_time = CURRENT_TIMESTAMP WHERE id = %s",
+                "UPDATE login_logs SET logout_time = CURRENT_TIMESTAMP WHERE id = ?",
                 (session['log_id'],)
             )
             conn.commit()
-        except mysql.connector.Error as err:
+        except sqlite3.Error as err:
             print(f"Database Error: {err}")
         finally:
             if cursor: cursor.close()
@@ -326,7 +332,7 @@ def admin_login_page():
         try:
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT id, password_hash FROM admins WHERE username = %s", (username,))
+            cursor.execute("SELECT id, password_hash FROM admins WHERE username = ?", (username,))
             admin = cursor.fetchone()
             
             if admin and bcrypt.checkpw(password.encode('utf-8'), admin['password_hash'].encode('utf-8')):
@@ -336,7 +342,7 @@ def admin_login_page():
                 return redirect(url_for('admin_dashboard'))
             else:
                 flash("Invalid admin credentials.", "error")
-        except mysql.connector.Error as err:
+        except sqlite3.Error as err:
             print(f"Database Error: {err}")
             flash(f"Database error: {err}", "error")
         finally:
@@ -371,7 +377,7 @@ def admin_dashboard():
         stats['total_users'] = cursor.fetchone()['c']
         cursor.execute("SELECT COUNT(*) as c FROM users WHERE account_status='active'")
         stats['active_users'] = cursor.fetchone()['c']
-        cursor.execute("SELECT COUNT(*) as c FROM login_logs WHERE DATE(login_time) = CURDATE()")
+        cursor.execute("SELECT COUNT(*) as c FROM login_logs WHERE DATE(login_time, '+5 hours', '30 minutes') = DATE('now', '+5 hours', '30 minutes')")
         stats['today_logins'] = cursor.fetchone()['c']
         cursor.execute("SELECT COUNT(*) as c FROM login_logs")
         stats['total_logins'] = cursor.fetchone()['c']
@@ -380,7 +386,7 @@ def admin_dashboard():
         query_conditions = ""
         params = []
         if search:
-            query_conditions = "WHERE username LIKE %s OR email LIKE %s"
+            query_conditions = "WHERE username LIKE ? OR email LIKE ?"
             params.extend([f"%{search}%", f"%{search}%"])
             
         order_by = "ORDER BY id DESC"
@@ -394,7 +400,7 @@ def admin_dashboard():
         total_pages = math.ceil(total_records / per_page)
         offset = (page - 1) * per_page
         
-        query = f"SELECT id, fullname, username, email, created_at, account_status FROM users {query_conditions} {order_by} LIMIT %s OFFSET %s"
+        query = f"SELECT id, fullname, username, email, created_at, account_status FROM users {query_conditions} {order_by} LIMIT ? OFFSET ?"
         params.extend([per_page, offset])
         cursor.execute(query, params)
         users = cursor.fetchall()
@@ -406,7 +412,7 @@ def admin_dashboard():
                 user['created_at'] = user['created_at'] + IST_OFFSET
         
         return render_template('admin/dashboard.html', stats=stats, users=users, current_page=page, total_pages=total_pages)
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Database Error: {err}")
         return f"Database Error: {err}", 500
     finally:
@@ -422,13 +428,13 @@ def admin_user_logs(user_id):
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        cursor.execute("SELECT fullname, username, email FROM users WHERE id = %s", (user_id,))
+        cursor.execute("SELECT fullname, username, email FROM users WHERE id = ?", (user_id,))
         target_user = cursor.fetchone()
         if not target_user:
             flash("User not found.", "error")
             return redirect(url_for('admin_dashboard'))
             
-        cursor.execute("SELECT login_time, logout_time, ip_address FROM login_logs WHERE user_id = %s ORDER BY login_time DESC LIMIT 50", (user_id,))
+        cursor.execute("SELECT login_time, logout_time, ip_address FROM login_logs WHERE user_id = ? ORDER BY login_time DESC LIMIT 50", (user_id,))
         logs = cursor.fetchall()
 
         IST_OFFSET = timedelta(hours=5, minutes=30)
@@ -441,7 +447,7 @@ def admin_user_logs(user_id):
                 log['logout_time'] = log['logout_time'] + IST_OFFSET
         
         return render_template('admin/user_logs.html', target_user=target_user, logs=logs)
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Database Error: {err}")
         return f"Database Error: {err}", 500
     finally:
