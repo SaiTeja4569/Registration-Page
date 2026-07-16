@@ -22,16 +22,9 @@ database_url = app.config.get('DATABASE_URL')
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-# Custom Connection class to ignore dictionary=True parameter in cursor() calls
-class PostgreSQLConnection(psycopg.Connection):
-    def cursor(self, *args, **kwargs):
-        kwargs.pop('dictionary', None)
-        return super().cursor(*args, **kwargs)
-
 def get_db_connection():
     conn = psycopg.connect(
         database_url,
-        connection_class=PostgreSQLConnection,
         row_factory=dict_row
     )
     return conn
@@ -140,7 +133,7 @@ def dashboard():
     cursor = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor()
         
         cursor.execute("SELECT fullname, username, email, mobile, created_at, account_status FROM users WHERE id = %s", (session['user_id'],))
         user = cursor.fetchone()
@@ -209,7 +202,7 @@ def api_register():
     cursor = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor()
 
         cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
         if cursor.fetchone(): return jsonify({"success": False, "message": "Email exists."}), 409
@@ -239,7 +232,7 @@ def api_login():
     cursor = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor()
 
         cursor.execute("SELECT id, username, password_hash, account_status FROM users WHERE username = %s OR email = %s", (username_or_email, username_or_email))
         user = cursor.fetchone()
@@ -315,7 +308,7 @@ def admin_login_page():
         cursor = None
         try:
             conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor()
             cursor.execute("SELECT id, password_hash FROM admins WHERE username = %s", (username,))
             admin = cursor.fetchone()
             
@@ -353,7 +346,7 @@ def admin_dashboard():
     cursor = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor()
         
         # Stats
         stats = {}
@@ -410,7 +403,7 @@ def admin_user_logs(user_id):
     cursor = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor()
         
         cursor.execute("SELECT fullname, username, email FROM users WHERE id = %s", (user_id,))
         target_user = cursor.fetchone()
